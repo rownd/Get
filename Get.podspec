@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = "Get"
-  s.version          = "1.0.1"
+  s.version          = "1.0.2"
   s.summary          = "Get"
   s.description      = "Rownd fork of kean/Get"
   s.homepage         = "https://github.com/rownd/Get"
