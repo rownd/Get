@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2021-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2021-2024 Alexander Grebenyuk (github.com/kean).
 
 import XCTest
 import Get
@@ -14,7 +14,7 @@ func checkSample01() {
         private var accessToken: String = ""
 
         func client(_ client: APIClient, willSendRequest request: inout URLRequest) async throws {
-            request.setValue("Bearer: \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
 
         func client(_ client: APIClient, shouldRetry task: URLSessionTask, error: Error, attempts: Int) async throws -> Bool {

@@ -1,5 +1,55 @@
 # Get 2.x
 
+## Get 2.2
+
+*Apr 13, 2024*
+
+- Increase the minimum supported Xcode version to 14.3
+- Fix warnings in unit tests
+
+## Get 2.1.6
+
+*Dec 25, 2022*
+
+- Fix downloads folder, by [@LePips](https://github.com/LePips) – [#72](https://github.com/kean/Get/pull/72) 
+
+## Get 2.1.5
+
+*Nov 2, 2022*
+
+- Fix warnings in Xcode 14.1
+- Move docc files back to the Sources/ 
+
+## Get 2.1.4
+
+*Oct 22, 2022*
+
+- Fix xcodebuild & docc issue in Xcode 14.0
+
+## Get 2.1.3
+
+*Oct 8, 2022*
+
+- Fix [#53](https://github.com/kean/Get/issues/53), a concurrency warning with strict concurrency checking  
+
+## Get 2.1.2
+
+*Sep 21, 2022*
+
+- Fix an issue with `withResponse` always setting method to `.get` - [#62](https://github.com/kean/Get/pull/62), thanks to @briancordanyoung
+
+## Get 2.1.1
+
+*Sep 20, 2022*
+
+- Fix concurrency issue in `DataLoader` with the new iOS 16 `didCreateTask` delegate method
+
+## Get 2.1.0
+
+*Sep 17, 2022*
+
+- Add support for optional responses. If the response is optional and the response body is empty, the request will now succeed and return `nil` - [#58](https://github.com/kean/Get/pull/58), thanks to [@Pomanks](https://github.com/Pomanks)
+
 ## Get 2.0.1
 
 *Sep 13, 2022*
@@ -25,6 +75,24 @@ This release is a quick follow-up to Get 1.0 that fixes some of the shortcomings
 
 
 # Get 1.x
+
+## Get 1.0.4
+
+*Sep 20, 2022*
+
+- Fix concurrency issue in `DataLoader` with the new iOS 16 `didCreateTask` delegate method
+
+## Get 1.0.3
+
+*Sep 13, 2022*
+
+- Add Xcode 14 support
+
+## Get 1.0.2
+
+*Aug 3, 2022* 
+
+- Revert back to supporting Swift 5.5 by @liamnichols in #47
 
 ## Get 1.0.1
 
@@ -203,7 +271,7 @@ let client = APIClient(host: "api.github.com") {
 
 *Dec 10, 2021*
 
-- Make `Configuration` init public - [#10](https://github.com/kean/APIClient/pull/10), thanks to [Theis Egeberg](https://github.com/theisegeberg)
+- Make `Configuration` init public - [#10](https://github.com/kean/APIClient/pull/10), thanks to [@theisegeberg](https://github.com/theisegeberg)
 - All `send` methods now return a new `Response<T>` struct containing not just the response value, but also data, request, response, and status code.
 - Add `value(for:)` method that returns `T` – a replacement for the old `send` method
 - Add `data(for:)` method returning `Response<Data>`

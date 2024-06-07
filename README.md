@@ -17,7 +17,7 @@ let client = APIClient(baseURL: URL(string: "https://api.github.com"))
 // Start sending requests
 let user: User = try await client.send(Request(path: "/user")).value
 
-var request = Request(path: "/user/emails", method: .post, body: ["alex@me.com"]
+var request = Request(path: "/user/emails", method: .post, body: ["alex@me.com"])
 try await client.send(request)
 ```
 
@@ -40,15 +40,15 @@ let response = try await client.send(Paths.user.get, delegate: delegate) {
 
 In addition to sending quick requests, it also supports downloading data to a file, uploading from a file, authentication, auto-retries, logging, and more. It's a kind of code that you would typically write on top of `URLSession` if you were using it directly.
 
+## Sponsor 💖
+
+[Support](https://github.com/sponsors/kean) Get on GitHub Sponsors.
+
 ## Documentation
 
 Learn how to use Get by going through the [documentation](https://kean-docs.github.io/get/documentation/get/) created using DocC.
 
 To learn more about `URLSession`, see [URL Loading System](https://developer.apple.com/documentation/foundation/url_loading_system).
-
-## Sponsors 💖
-
-[Support](https://github.com/sponsors/kean) Get on GitHub Sponsors.
 
 ## Integrations
 
@@ -89,6 +89,7 @@ Get is a lean framework with a lot of flexibility and customization points. It m
 
 | Get  | Date         | Swift | Xcode | Platforms                                            |
 |------|--------------|-------|-------|------------------------------------------------------|
+| 2.2  | Apr 13, 2024 | 5.8   | 14.3  | iOS 13.0, watchOS 6.0, macOS 10.15, tvOS 13.0, Linux |
 | 2.0  | Jul 26, 2022 | 5.5   | 13.3  | iOS 13.0, watchOS 6.0, macOS 10.15, tvOS 13.0, Linux |
 
 ## License

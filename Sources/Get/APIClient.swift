@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2021-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2021-2024 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 #if canImport(FoundationNetworking)
@@ -59,7 +59,7 @@ public actor APIClient {
     ///
     /// - parameter baseURL: A base URL. For example, `"https://api.github.com"`.
     /// - parameter configure: Updates the client configuration.
-    public init(baseURL: URL?, _ configure: (inout APIClient.Configuration) -> Void = { _ in }) {
+    public init(baseURL: URL?, _ configure: @Sendable (inout APIClient.Configuration) -> Void = { _ in }) {
         var configuration = Configuration(baseURL: baseURL)
         configure(&configuration)
         self.init(configuration: configuration)
@@ -96,13 +96,15 @@ public actor APIClient {
     ///   - delegate: A task-specific delegate.
     ///   - configure: Modifies the underlying `URLRequest` before sending it.
     ///
-    /// - returns: A response with a decoded body.
+    /// - returns: A response with a decoded body. If the response type is
+    /// optional and the response body is empty, returns `nil`.
     @discardableResult public func send<T: Decodable>(
         _ request: Request<T>,
         delegate: URLSessionDataDelegate? = nil,
         configure: ((inout URLRequest) throws -> Void)? = nil
     ) async throws -> Response<T> {
         let response = try await data(for: request, delegate: delegate, configure: configure)
+        let decoder = self.delegate.client(self, decoderForRequest: request) ?? self.decoder
         let value: T = try await decode(response.data, using: decoder)
         return response.map { _ in value }
     }
@@ -211,7 +213,8 @@ public actor APIClient {
     ///   - delegate: A task-specific delegate.
     ///   - configure: Modifies the underlying `URLRequest` before sending it.
     ///
-    /// Returns decoded response.
+    /// - returns: A response with a decoded body. If the response type is
+    /// optional and the response body is empty, returns `nil`.
     @discardableResult public func upload<T: Decodable>(
         for request: Request<T>,
         fromFile fileURL: URL,
@@ -219,6 +222,7 @@ public actor APIClient {
         configure: ((inout URLRequest) throws -> Void)? = nil
     ) async throws -> Response<T> {
         let response = try await _upload(for: request, fromFile: fileURL, delegate: delegate, configure: configure)
+        let decoder = self.delegate.client(self, decoderForRequest: request) ?? self.decoder
         let value: T = try await decode(response.data, using: decoder)
         return response.map { _ in value }
     }
@@ -231,7 +235,7 @@ public actor APIClient {
     ///   - delegate: A task-specific delegate.
     ///   - configure: Modifies the underlying `URLRequest` before sending it.
     ///
-    /// Returns decoded response.
+    /// - returns: Empry response.
     @discardableResult public func upload(
         for request: Request<Void>,
         fromFile fileURL: URL,
@@ -261,67 +265,69 @@ public actor APIClient {
             }
         }
     }
-	
-	// MARK: Upload Data
 
-	/// Convenience method for uploading data.
-	///
-	/// - parameters:
-	///   - request: The URLRequest for which to upload data.
-	///   - data: Data to upload.
-	///   - delegate: A task-specific delegate.
-	///   - configure: Modifies the underlying `URLRequest` before sending it.
-	///
-	/// Returns decoded response.
-	@discardableResult public func upload<T: Decodable>(
-		for request: Request<T>,
-		from data: Data,
-		delegate: URLSessionTaskDelegate? = nil,
-		configure: ((inout URLRequest) throws -> Void)? = nil
-	) async throws -> Response<T> {
-		let response = try await _upload(for: request, from: data, delegate: delegate, configure: configure)
-		let value: T = try await decode(response.data, using: decoder)
-		return response.map { _ in value }
-	}
-	
-	/// Convenience method for uploading data.
-	///
-	/// - parameters:
-	///   - request: The URLRequest for which to upload data.
-	///   - data: Data to upload.
-	///   - delegate: A task-specific delegate.
-	///   - configure: Modifies the underlying `URLRequest` before sending it.
-	///
-	/// Returns decoded response.
-	@discardableResult public func upload(
-		for request: Request<Void>,
-		from data: Data,
-		delegate: URLSessionTaskDelegate? = nil,
-		configure: ((inout URLRequest) throws -> Void)? = nil
-	) async throws -> Response<Void> {
-		try await _upload(for: request, from: data, delegate: delegate, configure: configure).map { _ in () }
-	}
-	
-	private func _upload<T>(
-		for request: Request<T>,
-		from data: Data,
-		delegate: URLSessionTaskDelegate?,
-		configure: ((inout URLRequest) throws -> Void)?
-	) async throws -> Response<Data> {
-		let request = try await makeURLRequest(for: request, configure)
-		return try await performRequest {
-			var request = request
-			try await self.delegate.client(self, willSendRequest: &request)
-			let task = session.uploadTask(with: request, from: data)
-			do {
-				let response = try await dataLoader.startUploadTask(task, session: session, delegate: delegate)
-				try validate(response)
-				return response
-			} catch {
-				throw DataLoaderError(task: task, error: error)
-			}
-		}
-	}
+    // MARK: Upload Data
+
+    /// Convenience method for uploading data.
+    ///
+    /// - parameters:
+    ///   - request: The URLRequest for which to upload data.
+    ///   - data: Data to upload.
+    ///   - delegate: A task-specific delegate.
+    ///   - configure: Modifies the underlying `URLRequest` before sending it.
+    ///
+    /// - returns: A response with a decoded body. If the response type is
+    /// optional and the response body is empty, returns `nil`.
+    @discardableResult public func upload<T: Decodable>(
+        for request: Request<T>,
+        from data: Data,
+        delegate: URLSessionTaskDelegate? = nil,
+        configure: ((inout URLRequest) throws -> Void)? = nil
+    ) async throws -> Response<T> {
+        let response = try await _upload(for: request, from: data, delegate: delegate, configure: configure)
+        let decoder = self.delegate.client(self, decoderForRequest: request) ?? self.decoder
+        let value: T = try await decode(response.data, using: decoder)
+        return response.map { _ in value }
+    }
+
+    /// Convenience method for uploading data.
+    ///
+    /// - parameters:
+    ///   - request: The URLRequest for which to upload data.
+    ///   - data: Data to upload.
+    ///   - delegate: A task-specific delegate.
+    ///   - configure: Modifies the underlying `URLRequest` before sending it.
+    ///
+    /// Returns decoded response.
+    @discardableResult public func upload(
+        for request: Request<Void>,
+        from data: Data,
+        delegate: URLSessionTaskDelegate? = nil,
+        configure: ((inout URLRequest) throws -> Void)? = nil
+    ) async throws -> Response<Void> {
+        try await _upload(for: request, from: data, delegate: delegate, configure: configure).map { _ in () }
+    }
+
+    private func _upload<T>(
+        for request: Request<T>,
+        from data: Data,
+        delegate: URLSessionTaskDelegate?,
+        configure: ((inout URLRequest) throws -> Void)?
+    ) async throws -> Response<Data> {
+        let request = try await makeURLRequest(for: request, configure)
+        return try await performRequest {
+            var request = request
+            try await self.delegate.client(self, willSendRequest: &request)
+            let task = session.uploadTask(with: request, from: data)
+            do {
+                let response = try await dataLoader.startUploadTask(task, session: session, delegate: delegate)
+                try validate(response)
+                return response
+            } catch {
+                throw DataLoaderError(task: task, error: error)
+            }
+        }
+    }
 
     // MARK: Making Requests
 
@@ -339,6 +345,7 @@ public actor APIClient {
         urlRequest.allHTTPHeaderFields = request.headers
         urlRequest.httpMethod = request.method.rawValue
         if let body = request.body {
+            let encoder = delegate.client(self, encoderForRequest: request) ?? self.encoder
             urlRequest.httpBody = try await encode(body, using: encoder)
             if urlRequest.value(forHTTPHeaderField: "Content-Type") == nil &&
                 session.configuration.httpAdditionalHeaders?["Content-Type"] == nil {

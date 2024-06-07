@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2021-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2021-2024 Alexander Grebenyuk (github.com/kean).
 
 import Foundation
 #if canImport(FoundationNetworking)
@@ -9,7 +9,7 @@ import FoundationNetworking
 
 // A simple URLSession wrapper adding async/await APIs compatible with older platforms.
 final class DataLoader: NSObject, URLSessionDataDelegate, URLSessionDownloadDelegate, @unchecked Sendable {
-    private var handlers = [URLSessionTask: TaskHandler]()
+    private let handlers = TaskHandlersDictionary()
 
     var userSessionDelegate: URLSessionDelegate? {
         didSet {
@@ -29,42 +29,45 @@ final class DataLoader: NSObject, URLSessionDataDelegate, URLSessionDownloadDele
     }()
 
     func startDataTask(_ task: URLSessionDataTask, session: URLSession, delegate: URLSessionDataDelegate?) async throws -> Response<Data> {
-        try await withTaskCancellationHandler(handler: { task.cancel() }) {
+        try await withTaskCancellationHandler(operation: {
             try await withUnsafeThrowingContinuation { continuation in
-                session.delegateQueue.addOperation {
-                    let handler = DataTaskHandler(delegate: delegate)
-                    handler.completion = continuation.resume(with:)
-                    self.handlers[task] = handler
-                }
+                let handler = DataTaskHandler(delegate: delegate)
+                handler.completion = continuation.resume(with:)
+                self.handlers[task] = handler
+
                 task.resume()
             }
-        }
+        }, onCancel: {
+            task.cancel()
+        })
     }
 
     func startDownloadTask(_ task: URLSessionDownloadTask, session: URLSession, delegate: URLSessionDownloadDelegate?) async throws -> Response<URL> {
-        try await withTaskCancellationHandler(handler: { task.cancel() }) {
+        try await withTaskCancellationHandler(operation: {
             try await withUnsafeThrowingContinuation { continuation in
-                session.delegateQueue.addOperation {
-                    let handler = DownloadTaskHandler(delegate: delegate)
-                    handler.completion = continuation.resume(with:)
-                    self.handlers[task] = handler
-                }
+                let handler = DownloadTaskHandler(delegate: delegate)
+                handler.completion = continuation.resume(with:)
+                self.handlers[task] = handler
+
                 task.resume()
             }
-        }
+        }, onCancel: {
+            task.cancel()
+        })
     }
 
     func startUploadTask(_ task: URLSessionUploadTask, session: URLSession, delegate: URLSessionTaskDelegate?) async throws -> Response<Data> {
-        try await withTaskCancellationHandler(handler: { task.cancel() }) {
+        try await withTaskCancellationHandler(operation: {
             try await withUnsafeThrowingContinuation { continuation in
-                session.delegateQueue.addOperation {
-                    let handler = DataTaskHandler(delegate: delegate)
-                    handler.completion = continuation.resume(with:)
-                    self.handlers[task] = handler
-                }
+                let handler = DataTaskHandler(delegate: delegate)
+                handler.completion = continuation.resume(with:)
+                self.handlers[task] = handler
+
                 task.resume()
             }
-        }
+        }, onCancel: {
+            task.cancel()
+        })
     }
 
     // MARK: - URLSessionDelegate
@@ -185,6 +188,16 @@ final class DataLoader: NSObject, URLSessionDataDelegate, URLSessionDownloadDele
         completionHandler(.continueLoading, nil)
 #endif
     }
+	
+	func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+#if os(Linux)
+		handlers[task]?.delegate?.urlSession(session, task: task, didSendBodyData: bytesSent, totalBytesSent: totalBytesSent, totalBytesExpectedToSend: totalBytesExpectedToSend) ??
+		userTaskDelegate?.urlSession(session, task: task, didSendBodyData: bytesSent, totalBytesSent: totalBytesSent, totalBytesExpectedToSend: totalBytesExpectedToSend)
+#else
+		handlers[task]?.delegate?.urlSession?(session, task: task, didSendBodyData: bytesSent, totalBytesSent: totalBytesSent, totalBytesExpectedToSend: totalBytesExpectedToSend) ??
+		userTaskDelegate?.urlSession?(session, task: task, didSendBodyData: bytesSent, totalBytesSent: totalBytesSent, totalBytesExpectedToSend: totalBytesExpectedToSend)
+#endif
+	}
 
     // MARK: - URLSessionDataDelegate
 
@@ -245,7 +258,7 @@ final class DataLoader: NSObject, URLSessionDataDelegate, URLSessionDownloadDele
         let handler = (handlers[downloadTask] as? DownloadTaskHandler)
         let downloadsURL = DataLoader.downloadDirectoryURL
         try? FileManager.default.createDirectory(at: downloadsURL, withIntermediateDirectories: true, attributes: nil)
-        let newLocation = downloadsURL.appendingPathExtension(location.lastPathComponent)
+        let newLocation = downloadsURL.appendingPathComponent(location.lastPathComponent)
         try? FileManager.default.moveItem(at: location, to: newLocation)
         handler?.location = newLocation
         handler?.downloadDelegate?.urlSession(session, downloadTask: downloadTask, didFinishDownloadingTo: newLocation)
@@ -312,17 +325,11 @@ private final class DownloadTaskHandler: TaskHandler {
 
 // MARK: - Helpers
 
+protocol OptionalDecoding {}
+
 struct DataLoaderError: Error {
     let task: URLSessionTask
     let error: Error
-}
-
-struct AnyEncodable: Encodable {
-    let value: Encodable
-
-    func encode(to encoder: Encoder) throws {
-        try value.encode(to: encoder)
-    }
 }
 
 extension OperationQueue {
@@ -333,20 +340,24 @@ extension OperationQueue {
     }
 }
 
-func encode(_ value: Encodable, using encoder: JSONEncoder) async throws -> Data? {
+extension Optional: OptionalDecoding {}
+
+func encode(_ value: some Encodable, using encoder: JSONEncoder) async throws -> Data? {
     if let data = value as? Data {
         return data
     } else if let string = value as? String {
         return string.data(using: .utf8)
     } else {
         return try await Task.detached {
-            try encoder.encode(AnyEncodable(value: value))
+            try encoder.encode(value)
         }.value
     }
 }
 
 func decode<T: Decodable>(_ data: Data, using decoder: JSONDecoder) async throws -> T {
-    if T.self == Data.self {
+    if data.isEmpty, T.self is OptionalDecoding.Type {
+        return Optional<Decodable>.none as! T
+    } else if T.self == Data.self {
         return data as! T
     } else if T.self == String.self {
         guard let string = String(data: data, encoding: .utf8) else {
@@ -357,5 +368,26 @@ func decode<T: Decodable>(_ data: Data, using decoder: JSONDecoder) async throws
         return try await Task.detached {
             try decoder.decode(T.self, from: data)
         }.value
+    }
+}
+
+/// With iOS 16, there is now a delegate method (`didCreateTask`) that gets
+/// called outside of the session's delegate queue, which means that the access
+/// needs to be synchronized.
+private final class TaskHandlersDictionary {
+    private let lock = NSLock()
+    private var handlers = [URLSessionTask: TaskHandler]()
+
+    subscript(task: URLSessionTask) -> TaskHandler? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return handlers[task]
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            handlers[task] = newValue
+        }
     }
 }

@@ -14,14 +14,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        xcode: ["13.4.1", "13.3.1", "13.2.1"]
+        xcode: ["14.3", "15.0", "15.3"]
         include:
-          - xcode: "13.4.1"
-            macos: macOS-12
-          - xcode: "13.3.1"
-            macos: macOS-12
-          - xcode: "13.2.1"
-            macos: macOS-11
+          - xcode: "15.3"
+            macos: macOS-14
+          - xcode: "15.0"
+            macos: macOS-14
+          - xcode: "14.3"
+            macos: macOS-13
     runs-on: ${{ matrix.macos }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
@@ -35,23 +35,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        swift: ["5.5", "5.6"]
+        swift: ["5.9"]
     runs-on: ubuntu-latest
     container: swift:${{ matrix.swift }}
     steps:
       - uses: actions/checkout@v2
       - name: Run Tests
         run: swift test
-
-  discover-typos:
-    name: Discover Typos
-    runs-on: macOS-12
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_13.4.1.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@v2
-      - name: Discover typos
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install codespell
-          codespell --ignore-words-list="inout,theis" --skip="./.build/*,./Tests/GetTests/Mocker/*"

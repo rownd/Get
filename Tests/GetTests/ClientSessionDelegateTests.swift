@@ -1,6 +1,6 @@
 // The MIT License (MIT)
 //
-// Copyright (c) 2021-2022 Alexander Grebenyuk (github.com/kean).
+// Copyright (c) 2021-2024 Alexander Grebenyuk (github.com/kean).
 
 import XCTest
 @testable import Get
@@ -78,7 +78,11 @@ final class APIClientSessionDelegateTests: XCTestCase {
 
         client.session.invalidateAndCancel()
 
+#if swift(>=5.9)
+        await fulfillment(of: [expectation], timeout: 2)
+#else
         wait(for: [expectation], timeout: 2)
+#endif
     }
 
     // MARK: - Per-Task Delegate
